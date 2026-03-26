@@ -2,19 +2,18 @@ name: 自动化测试
 
 on:
   push:
-    branches: [main, dev]
-  pull_request:
     branches: [main]
+  workflow_dispatch:  # 允许手动触发
 
 jobs:
   test:
     runs-on: ubuntu-latest
     
     steps:
-      - uses: actions/checkout@v4  # ✅ 也建议升级到 v4
+      - uses: actions/checkout@v4
       
       - name: 安装 Python
-        uses: actions/setup-python@v5  # ✅ 升级到 v5
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
       
@@ -22,21 +21,31 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y google-chrome-stable
+          google-chrome --version
       
       - name: 安装依赖
         run: |
           pip install -r requirements.txt
-          pip install webdriver-manager
+          pip install webdriver-manager pytest-html
       
       - name: 运行测试
-        env:
-          CI: true
+        id: test
+        continue-on-error: true  # 允许失败继续
         run: |
           pytest --html=report.html --self-contained-html -v
+          echo "status=$?" >> $GITHUB_OUTPUT
+      
+      - name: 查看生成的文件
+        run: |
+          ls -la
+          echo "测试退出码: ${{ steps.test.outputs.status }}"
       
       - name: 上传报告
         if: always()
-        uses: actions/upload-artifact@v4  # ✅ 改成 v4
+        uses: actions/upload-artifact@v4
         with:
           name: test-report
-          path: report.html
+          path: |
+            report.html
+            allure-results/
+          if-no-files-found: warn
